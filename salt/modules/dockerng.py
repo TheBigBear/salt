@@ -102,6 +102,19 @@ The second way is to use separate pillar variables ending in
 Both methods can be combined; any registry configured under
 ``docker-registries`` or ``*-docker-registries`` will be detected.
 
+Configuration Options
+---------------------
+
+The following options can be set in the :ref:`minion config
+<configuration-salt-minion>`:
+
+- ``docker.url``: URL to the docker service (default: local socket).
+- ``docker.version``: API version to use (default: currently 1.4 API).
+- ``docker.exec_driver``: Execution driver to use, one of the following:
+    - nsenter
+    - lxc-attach
+    - docker-exec
+    See :ref:`Executing Commands Within a Running Container <docker-execution-driver>`.
 
 Functions
 ---------
@@ -2652,6 +2665,16 @@ def create(image,
             val = VALID_CREATE_OPTS[key]
             if 'api_name' in val:
                 create_kwargs[val['api_name']] = create_kwargs.pop(key)
+
+    # Added to manage api change in 1.19.
+    # mem_limit and memswap_limit must be provided in host_config object
+    if salt.utils.version_cmp(version()['ApiVersion'], '1.18') == 1:
+        create_kwargs['host_config'] = docker.utils.create_host_config(mem_limit=create_kwargs.get('mem_limit'),
+                                                                       memswap_limit=create_kwargs.get('memswap_limit'))
+        if 'mem_limit' in create_kwargs:
+            del create_kwargs['mem_limit']
+        if 'memswap_limit' in create_kwargs:
+            del create_kwargs['memswap_limit']
 
     log.debug(
         'dockerng.create is using the following kwargs to create '
