@@ -271,16 +271,6 @@ class Compiler(object):
         self.opts = opts
         self.rend = renderers
 
-    # We need __setstate__ and __getstate__ to avoid pickling errors since
-    # 'self.rend' contains a function reference which is not picklable.
-    # These methods are only used when pickling so will not be used on
-    # non-Windows platforms.
-    def __setstate__(self, state):
-        self.__init__(state['opts'])
-
-    def __getstate__(self):
-        return {'opts': self.opts}
-
     def render_template(self, template, **kwargs):
         '''
         Enforce the states in a template
@@ -824,7 +814,8 @@ class State(object):
                                         func[func.rindex('.'):]
                                         )
                                 self.functions[f_key] = funcs[func]
-        self.states = salt.loader.states(self.opts, self.functions, self.utils)
+        self.serializers = salt.loader.serializers(self.opts)
+        self.states = salt.loader.states(self.opts, self.functions, self.utils, self.serializers)
         self.rend = salt.loader.render(self.opts, self.functions, states=self.states)
 
     def module_refresh(self):
@@ -3290,7 +3281,8 @@ class MasterState(State):
         # Load the states, but they should not be used in this class apart
         # from inspection
         self.utils = salt.loader.utils(self.opts)
-        self.states = salt.loader.states(self.opts, self.functions, self.utils)
+        self.serializers = salt.loader.serializers(self.opts)
+        self.states = salt.loader.states(self.opts, self.functions, self.utils, self.serializers)
         self.rend = salt.loader.render(self.opts, self.functions, states=self.states)
 
 
