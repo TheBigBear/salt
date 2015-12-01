@@ -1831,6 +1831,14 @@ class SaltCMDOptionParser(six.with_metaclass(OptionParserMeta,
                   'minions to have running')
         )
         self.add_option(
+            '--batch-wait',
+            default=0,
+            dest='batch_wait',
+            type=float,
+            help=('Wait the specified time in seconds after each job is done '
+                  'before freeing the slot in the batch for the next one')
+        )
+        self.add_option(
             '-a', '--auth', '--eauth', '--external-auth',
             default='',
             dest='eauth',
@@ -2934,6 +2942,12 @@ class SPMParser(six.with_metaclass(OptionParserMeta,
             default=False,
             action='store_true',
             help='Default yes in answer to all confirmation questions.'
+        )
+        self.add_option(
+            '-v', '--verbose',
+            default=False,
+            action='store_true',
+            help='Display more detailed information.'
         )
 
     def _mixin_after_parsed(self):
