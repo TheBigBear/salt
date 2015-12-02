@@ -247,7 +247,7 @@ def present(name,
 
     home
         The custom login directory of user. Uses default value of underlying
-        system if not set. Notice that this directory does not have to exists.
+        system if not set. Notice that this directory does not have to exist.
         This also the location of the home directory to create if createhome is
         set to True.
 
@@ -261,6 +261,7 @@ def present(name,
         Linux, FreeBSD, NetBSD, OpenBSD, and Solaris. If the ``empty_password``
         argument is set to ``True`` then ``password`` is ignored.
         For Windows this is the plain text password.
+        For Linux, the hash can be generated with ``openssl passwd -1``.
 
     .. versionchanged:: 0.16.0
        BSD support added.

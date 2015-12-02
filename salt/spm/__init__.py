@@ -256,7 +256,10 @@ class SPMClient(object):
                 else:
                     self._verbose('Installing file {0} to {1}'.format(member.name, out_path), log.trace)
                     file_hash = hashlib.sha1()
-                    digest = self._pkgfiles_fun('hash_file', out_path, file_hash, self.files_conn)
+                    digest = self._pkgfiles_fun('hash_file',
+                                                os.path.join(out_path, member.name),
+                                                file_hash,
+                                                self.files_conn)
                 self._pkgdb_fun('register_file',
                                 name,
                                 member,
@@ -520,7 +523,7 @@ class SPMClient(object):
         '''
         Display verbose information
         '''
-        if self.opts['verbose']:
+        if self.opts.get('verbose', False) is True:
             self.ui.status(msg)
         level(msg)
 
