@@ -140,6 +140,9 @@ def bootstrap(
             flavor=wheezy static_qemu=/usr/bin/qemu-x86_64-static
 
     '''
+    if img_format not in ('dir', 'sparse'):
+        raise SaltInvocationError('The img_format must be "sparse" or "dir"')
+
     if img_format == 'dir':
         # We can just use the root as the root
         if not __salt__['file.directory_exists'](root):
@@ -154,8 +157,17 @@ def bootstrap(
             mount_dir = '/opt/salt-genesis.{0}'.format(uuid.uuid4())
         __salt__['file.mkdir'](mount_dir, 'root', 'root', '755')
         __salt__['cmd.run'](('fallocate', '-l', img_size, root), python_shell=False)
-        _mkfs(root, fs_format, fs_opts)
-        __salt__['mount.mount'](mount_dir, root, opts='loop')
+        _mkpart(root, fs_format, fs_opts, mount_dir)
+
+        loop1 = __salt__['cmd.run']('losetup -f')
+        log.debug('First loop device is {0}'.format(loop1))
+        __salt__['cmd.run']('losetup {0} {1}'.format(loop1, root))
+        loop2 = __salt__['cmd.run']('losetup -f')
+        log.debug('Second loop device is {0}'.format(loop2))
+        start = str(2048 * 2048)
+        __salt__['cmd.run']('losetup -o {0} {1} {2}'.format(start, loop2, loop1))
+        __salt__['mount.mount'](mount_dir, loop2)
+
         _populate_cache(platform, pkg_cache, mount_dir)
 
     if mount_dir:
@@ -193,8 +205,51 @@ def bootstrap(
         )
 
     if img_format != 'dir':
+        blkinfo = __salt__['disk.blkid'](loop2)
+        __salt__['file.replace'](
+            '{0}/boot/grub/grub.cfg'.format(mount_dir),
+            'ad4103fa-d940-47ca-8506-301d8071d467',  # This seems to be the default
+            blkinfo[loop2]['UUID']
+        )
         __salt__['mount.umount'](root)
+        __salt__['cmd.run']('losetup -d {0}'.format(loop2))
+        __salt__['cmd.run']('losetup -d {0}'.format(loop1))
         __salt__['file.rmdir'](mount_dir)
+
+
+def _mkpart(root, fs_format, fs_opts, mount_dir):
+    '''
+    Make a partition, and make it bootable
+    '''
+    __salt__['partition.mklabel'](root, 'msdos')
+    loop1 = __salt__['cmd.run']('losetup -f')
+    log.debug('First loop device is {0}'.format(loop1))
+    __salt__['cmd.run']('losetup {0} {1}'.format(loop1, root))
+    part_info = __salt__['partition.list'](loop1)
+    start = str(2048 * 2048) + 'B'
+    end = part_info['info']['size']
+    __salt__['partition.mkpart'](loop1, 'primary', start=start, end=end)
+    __salt__['partition.set'](loop1, '1', 'boot', 'on')
+    part_info = __salt__['partition.list'](loop1)
+    loop2 = __salt__['cmd.run']('losetup -f')
+    log.debug('Second loop device is {0}'.format(loop2))
+    start = start.rstrip('B')
+    __salt__['cmd.run']('losetup -o {0} {1} {2}'.format(start, loop2, loop1))
+    _mkfs(loop2, fs_format, fs_opts)
+    __salt__['mount.mount'](mount_dir, loop2)
+    __salt__['cmd.run']((
+        'grub-install',
+        '--target=i386-pc',
+        '--debug',
+        '--no-floppy',
+        '--modules=part_msdos linux',
+        '--boot-directory={0}/boot'.format(mount_dir),
+        loop1
+    ), python_shell=False)
+    __salt__['mount.umount'](mount_dir)
+    __salt__['cmd.run']('losetup -d {0}'.format(loop2))
+    __salt__['cmd.run']('losetup -d {0}'.format(loop1))
+    return part_info
 
 
 def _mkfs(root, fs_format, fs_opts=None):
@@ -407,7 +462,7 @@ def _bootstrap_pacman(
     if pkgs is None:
         pkgs = []
 
-    default_pkgs = ('pacman', 'linux')
+    default_pkgs = ('pacman', 'linux', 'systemd-sysvcompat', 'grub')
     for pkg in default_pkgs:
         if pkg not in pkgs:
             pkgs.append(pkg)
@@ -584,3 +639,48 @@ def _compress(compress):
         ext = 'xz'
 
     return compression, ext
+
+
+def ldd_deps(filename, ret=None):
+    '''
+    Recurse through a set of dependencies reported by ``ldd``, to find
+    associated dependencies.
+
+    Please note that this does not necessarily resolve all (non-package)
+    dependencies for a file; but it does help.
+
+    CLI Example:
+
+        salt myminion genesis.ldd_deps bash
+        salt myminion genesis.ldd_deps /bin/bash
+    '''
+    if not os.path.exists(filename):
+        filename = salt.utils.which(filename)
+
+    if ret is None:
+        ret = []
+
+    out = __salt__['cmd.run'](('ldd', filename), python_shell=False)
+    for line in out.splitlines():
+        if not line.strip():
+            continue
+        dep_path = ''
+        if '=>' in line:
+            comps = line.split(' => ')
+            dep_comps = comps[1].strip().split()
+            if os.path.exists(dep_comps[0]):
+                dep_path = dep_comps[0]
+        else:
+            dep_comps = line.strip().split()
+            if os.path.exists(dep_comps[0]):
+                dep_path = dep_comps[0]
+
+        if dep_path:
+            if dep_path not in ret:
+                ret.append(dep_path)
+                new_deps = ldd_deps(dep_path, ret)
+                for dep in new_deps:
+                    if dep not in ret:
+                        ret.append(dep)
+
+    return ret
