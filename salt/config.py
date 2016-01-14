@@ -387,6 +387,9 @@ VALID_OPTS = {
     # Events matching a tag in this list should never be sent to an event returner.
     'event_return_blacklist': list,
 
+    # default match type for filtering events tags: startswith, endswith, find, regex, fnmatch
+    'event_match_type': str,
+
     # This pidfile to write out to when a daemon starts
     'pidfile': str,
 
@@ -419,6 +422,11 @@ VALID_OPTS = {
     # Set the zeromq high water mark on the publisher interface.
     # http://api.zeromq.org/3-2:zmq-setsockopt
     'pub_hwm': int,
+
+    # ZMQ HWM for SaltEvent pub socket
+    'salt_event_pub_hwm': int,
+    # ZMQ HWM for EventPublisher pub socket
+    'event_publisher_pub_hwm': int,
 
     # The number of MWorker processes for a master to startup. This number needs to scale up as
     # the number of connected minions increases.
@@ -776,7 +784,7 @@ DEFAULT_MINION_OPTS = {
     'user': 'root',
     'root_dir': salt.syspaths.ROOT_DIR,
     'pki_dir': os.path.join(salt.syspaths.CONFIG_DIR, 'pki', 'minion'),
-    'id': None,
+    'id': '',
     'cachedir': os.path.join(salt.syspaths.CACHE_DIR, 'minion'),
     'cache_jobs': False,
     'grains_cache': False,
@@ -957,12 +965,21 @@ DEFAULT_MINION_OPTS = {
     'sudo_user': '',
     'http_request_timeout': 1 * 60 * 60.0,  # 1 hour
     'http_max_body': 100 * 1024 * 1024 * 1024,  # 100GB
+    # ZMQ HWM for SaltEvent pub socket - different for minion vs. master
+    'salt_event_pub_hwm': 2000,
+    # ZMQ HWM for EventPublisher pub socket - different for minion vs. master
+    'event_publisher_pub_hwm': 1000,
+    'event_match_type': 'startswith',
 }
 
 DEFAULT_MASTER_OPTS = {
     'interface': '0.0.0.0',
     'publish_port': '4505',
     'pub_hwm': 1000,
+    # ZMQ HWM for SaltEvent pub socket - different for minion vs. master
+    'salt_event_pub_hwm': 2000,
+    # ZMQ HWM for EventPublisher pub socket - different for minion vs. master
+    'event_publisher_pub_hwm': 1000,
     'auth_mode': 1,
     'user': 'root',
     'worker_threads': 5,
@@ -1102,6 +1119,7 @@ DEFAULT_MASTER_OPTS = {
     'event_return_queue': 0,
     'event_return_whitelist': [],
     'event_return_blacklist': [],
+    'event_match_type': 'startswith',
     'serial': 'msgpack',
     'state_verbose': True,
     'state_output': 'full',
@@ -2729,7 +2747,7 @@ def apply_minion_config(overrides=None,
 
     # No ID provided. Will getfqdn save us?
     using_ip_for_id = False
-    if opts['id'] is None:
+    if not opts.get('id'):
         opts['id'], using_ip_for_id = get_id(
                 opts,
                 cache_minion_id=cache_minion_id)
@@ -2846,7 +2864,7 @@ def apply_master_config(overrides=None, defaults=None):
 
     using_ip_for_id = False
     append_master = False
-    if opts.get('id') is None:
+    if not opts.get('id'):
         opts['id'], using_ip_for_id = get_id(
                 opts,
                 cache_minion_id=None)
