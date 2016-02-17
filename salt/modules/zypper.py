@@ -290,9 +290,21 @@ def version(*names, **kwargs):
 
 def list_pkgs(versions_as_list=False, **kwargs):
     '''
-    List the packages currently installed as a dict::
+    List the packages currently installed as a dict with versions
+    as a comma separated string::
 
-        {'<package_name>': '<version>'}
+        {'<package_name>': '<version>[,<version>...]'}
+
+    versions_as_list:
+        If set to true, the versions are provided as a list
+
+        {'<package_name>': ['<version>', '<version>']}
+
+    removed:
+        not supported
+
+    purge_desired:
+        not supported
 
     CLI Example:
 
@@ -1204,6 +1216,9 @@ def list_products(all=False):
     all
         List all products available or only installed. Default is False.
 
+    Includes handling for OEM products, which read the OEM productline file
+    and overwrite the release value.
+
     CLI Examples:
 
     .. code-block:: bash
@@ -1212,6 +1227,7 @@ def list_products(all=False):
         salt '*' pkg.list_products all=True
     '''
     ret = list()
+    OEM_PATH = "/var/lib/suseRegister/OEM"
     doc = dom.parseString(__salt__['cmd.run'](("zypper -x products{0}".format(not all and ' -i' or '')),
                                               output_loglevel='trace'))
     for prd in doc.getElementsByTagName('product-list')[0].getElementsByTagName('product'):
@@ -1225,7 +1241,13 @@ def list_products(all=False):
                 prd.getElementsByTagName('description')
             ).split(os.linesep)]
         )
-
+        if 'productline' in p_nfo and p_nfo['productline']:
+            oem_file = os.path.join(OEM_PATH, p_nfo['productline'])
+            if os.path.isfile(oem_file):
+                with salt.utils.fopen(oem_file, 'r') as rfile:
+                    oem_release = rfile.readline().strip()
+                    if oem_release:
+                        p_nfo['release'] = oem_release
         ret.append(p_nfo)
 
     return ret
