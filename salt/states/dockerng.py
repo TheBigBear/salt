@@ -183,6 +183,8 @@ def _compare(actual, create_kwargs, defaults_from_image):
             continue
 
         elif item == 'environment':
+            if actual_data is None:
+                actual_data = []
             actual_env = {}
             for env_var in actual_data:
                 try:
@@ -217,6 +219,8 @@ def _compare(actual, create_kwargs, defaults_from_image):
             actual_ports = sorted(actual_data)
             desired_ports = []
             for port_def in data:
+                if isinstance(port_def, six.integer_types):
+                    port_def = str(port_def)
                 if isinstance(port_def, tuple):
                     desired_ports.append('{0}/{1}'.format(*port_def))
                 elif '/' not in port_def:
