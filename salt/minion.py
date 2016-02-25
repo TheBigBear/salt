@@ -422,6 +422,7 @@ class MinionBase(object):
                              ' {0}'.format(opts['master']))
                     if opts['master_shuffle']:
                         shuffle(opts['master'])
+                    opts['auth_tries'] = 0
                 # if opts['master'] is a str and we have never created opts['master_list']
                 elif isinstance(opts['master'], str) and ('master_list' not in opts):
                     # We have a string, but a list was what was intended. Convert.
@@ -1461,7 +1462,7 @@ class Minion(MinionBase):
                    '{0}. This is often due to the master being shut down or '
                    'overloaded. If the master is running consider increasing '
                    'the worker_threads value.').format(jid)
-            log.warn(msg)
+            log.warning(msg)
             return ''
 
         log.trace('ret_val = {0}'.format(ret_val))  # pylint: disable=no-member
@@ -2573,26 +2574,28 @@ class Matcher(object):
         '''
         Matches based on IP address or CIDR notation
         '''
-
         try:
-            tgt = ipaddress.ip_network(tgt)
-            # Target is a network
-            proto = 'ipv{0}'.format(tgt.version)
-            if proto not in self.opts['grains']:
-                return False
-            else:
-                return salt.utils.network.in_subnet(tgt, self.opts['grains'][proto])
+            # Target is an address?
+            tgt = ipaddress.ip_address(tgt)
         except:  # pylint: disable=bare-except
             try:
-                # Target should be an address
-                proto = 'ipv{0}'.format(ipaddress.ip_address(tgt).version)
-                if proto not in self.opts['grains']:
-                    return False
-                else:
-                    return tgt in self.opts['grains'][proto]
+                # Target is a network?
+                tgt = ipaddress.ip_network(tgt)
             except:  # pylint: disable=bare-except
-                log.error('Invalid IP/CIDR target {0}"'.format(tgt))
-                return False
+                log.error('Invalid IP/CIDR target: {0}'.format(tgt))
+                return []
+        proto = 'ipv{0}'.format(tgt.version)
+
+        grains = self.opts['grains']
+
+        if proto not in grains:
+            match = False
+        elif isinstance(tgt, (ipaddress.IPv4Address, ipaddress.IPv6Address)):
+            match = str(tgt) in grains[proto]
+        else:
+            match = salt.utils.network.in_subnet(tgt, grains[proto])
+
+        return match
 
     def range_match(self, tgt):
         '''
