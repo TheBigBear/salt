@@ -1,8 +1,17 @@
 .. _installation-debian:
 
-===================
-Debian Installation
-===================
+===========================
+Debian GNU/Linux / Raspbian
+===========================
+
+Debian GNU/Linux distribution and some devariatives such as Raspbian already
+have included Salt packages to their repositories. However, current stable
+release codenamed "Jessie" contains old outdated Salt release. It is
+recommended to use SaltStack repository for Debian as described
+:ref:`below <installation-debian-repo>`.
+
+Installation from official Debian and Raspbian repositories is described
+:ref:`here <installation-debian-raspbian>`.
 
 .. _installation-debian-repo:
 
@@ -39,13 +48,7 @@ To install using the SaltStack repository:
 
 #. Run ``sudo apt-get update``.
 
-#. Install the salt-minion, salt-master, or other Salt components:
-
-   - ``apt-get install salt-master``
-   - ``apt-get install salt-minion``
-   - ``apt-get install salt-ssh``
-   - ``apt-get install salt-syndic``
-   - ``apt-get install salt-cloud``
+#. Now go to the :ref:`packages installation <debian-install-pkgs>` section.
 
 Installation from the Community Repository
 ==========================================
@@ -102,7 +105,6 @@ For Stretch, the following line is needed in either
 
     deb http://debian.saltstack.com/debian stretch-saltstack main
 
-
 Sid (Unstable)
 --------------
 
@@ -113,9 +115,8 @@ For Sid, the following line is needed in either
 
     deb http://debian.saltstack.com/debian unstable main
 
-
-Import the repository key.
---------------------------
+Import the repository key
+-------------------------
 
 You will need to import the key used for signing.
 
@@ -139,37 +140,72 @@ Update the package database
 
     apt-get update
 
+.. _installation-debian-raspbian:
 
-Install packages
-----------------
-
-Install the Salt master, minion, or syndic from the repository with the apt-get
-command. These examples each install one daemon, but more than one package name
-may be given at a time:
-
-   - ``apt-get install salt-master``
-   - ``apt-get install salt-minion``
-   - ``apt-get install salt-ssh``
-   - ``apt-get install salt-syndic``
-
-Installation from the Debian Main Repository
-============================================
+Installation from the Debian / Raspbian Official Repository
+===========================================================
 
 Stretch (Testing) and Sid (Unstable) distributions are already contain mostly
-up-to-date Salt packages built by Debian Salt Team.
+up-to-date Salt packages built by Debian Salt Team. You can install Salt
+components directly from Debian.
 
-Install Salt components directly from Debian:
+On Jessie (Stable) there is an option to install Salt minion from Stretch with
+`python-tornado` dependency from `jessie-backports` repositories.
 
-   - ``apt-get install salt-api``
-   - ``apt-get install salt-cloud``
-   - ``apt-get install salt-doc``
-   - ``apt-get install salt-master``
-   - ``apt-get install salt-minion``
-   - ``apt-get install salt-proxy``
-   - ``apt-get install salt-ssh``
-   - ``apt-get install salt-syndic``
+To install fresh release of Salt minion on Jessie:
 
-.. _Debian-config:
+#. Add `jessie-backports` and `stretch` repositories:
+
+   **Debian**:
+
+   .. code-block:: bash
+
+       echo 'deb http://httpredir.debian.org/debian jessie-backports main' >> /etc/apt/sources.list
+       echo 'deb http://httpredir.debian.org/debian stretch main' >> /etc/apt/sources.list
+
+   **Raspbian**:
+
+   .. code-block:: bash
+
+       echo 'deb http://httpredir.debian.org/debian jessie-backports main' >> /etc/apt/sources.list
+       echo 'deb http://archive.raspbian.org/raspbian/ stretch main' >> /etc/apt/sources.list
+
+#. Make Jessie a default release:
+
+   .. code-block:: bash
+
+       echo 'APT::Default-Release "jessie";' > /etc/apt/apt.conf.d/10apt
+
+#. Install Salt dependencies:
+
+   .. code-block:: bash
+
+       apt-get update
+       apt-get install python-zmq python-tornado/jessie-backports salt-common/stretch
+
+#. Install Salt minion package from Stretch:
+
+   .. code-block:: bash
+
+       apt-get install salt-minion/stretch
+
+.. _debian-install-pkgs:
+
+Install Packages
+================
+
+Install the Salt master, minion or other packages from the repository with
+the `apt-get` command. These examples each install one of Salt components, but
+more than one package name may be given at a time:
+
+- ``apt-get install salt-api``
+- ``apt-get install salt-cloud``
+- ``apt-get install salt-master``
+- ``apt-get install salt-minion``
+- ``apt-get install salt-ssh``
+- ``apt-get install salt-syndic``
+
+.. _debian-config:
 
 Post-installation tasks
 =======================
