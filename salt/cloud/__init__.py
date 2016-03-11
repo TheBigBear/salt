@@ -1290,11 +1290,13 @@ class Cloud(object):
                     )
                 )
 
-                client = salt.client.get_local_client(mopts=mopts_)
+                client = salt.client.get_local_client(mopts=self.opts)
 
-                ret = client.cmd(vm_['name'], 'saltutil.sync_{0}'.format(
-                    self.opts['sync_after_install']
-                ))
+                ret = client.cmd(
+                    vm_['name'],
+                    'saltutil.sync_{0}'.format(self.opts['sync_after_install']),
+                    timeout=self.opts['timeout']
+                )
                 log.info(
                     six.u('Synchronized the following dynamic modules: '
                           '  {0}').format(ret)
@@ -1388,19 +1390,26 @@ class Cloud(object):
         if main_cloud_config is None:
             main_cloud_config = {}
 
-        profile_details = self.opts['profiles'][profile]
-        alias, driver = profile_details['provider'].split(':')
         mapped_providers = self.map_providers_parallel()
-        alias_data = mapped_providers.setdefault(alias, {})
-        vms = alias_data.setdefault(driver, {})
+        profile_details = self.opts['profiles'][profile]
+        vms = {}
+        for prov in mapped_providers:
+            prov_name = mapped_providers[prov].keys()[0]
+            for node in mapped_providers[prov][prov_name]:
+                vms[node] = mapped_providers[prov][prov_name][node]
+                vms[node]['provider'] = prov
+                vms[node]['driver'] = prov_name
+        alias, driver = profile_details['provider'].split(':')
 
         provider_details = self.opts['providers'][alias][driver].copy()
         del provider_details['profiles']
 
         for name in names:
             if name in vms:
+                prov = vms[name]['provider']
+                driv = vms[name]['driver']
                 msg = six.u('{0} already exists under {1}:{2}').format(
-                    name, alias, driver
+                    name, prov, driv
                 )
                 log.error(msg)
                 ret[name] = {'Error': msg}
