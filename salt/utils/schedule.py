@@ -355,7 +355,11 @@ class Schedule(object):
         log.debug('Persisting schedule')
         try:
             with salt.utils.fopen(schedule_conf, 'wb+') as fp_:
-                fp_.write(yaml.dump({'schedule': self.opts['schedule']}))
+                fp_.write(
+                    salt.utils.to_bytes(
+                        yaml.dump({'schedule': self.opts['schedule']})
+                    )
+                )
         except (IOError, OSError):
             log.error('Failed to persist the updated schedule',
                       exc_info_on_loglevel=logging.DEBUG)
@@ -764,11 +768,11 @@ class Schedule(object):
                         # Send back to master so the job is included in the job list
                         mret = ret.copy()
                         mret['jid'] = 'req'
-                        channel = salt.transport.Channel.factory(self.opts, usage='salt_schedule')
+                        event = salt.utils.event.get_event('minion', opts=self.opts, listen=False)
                         load = {'cmd': '_return', 'id': self.opts['id']}
                         for key, value in six.iteritems(mret):
                             load[key] = value
-                        channel.send(load)
+                        event.fire_event(load, '__schedule_return')
 
                 log.debug('schedule.handle_func: Removing {0}'.format(proc_fn))
                 os.unlink(proc_fn)
