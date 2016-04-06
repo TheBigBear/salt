@@ -685,7 +685,7 @@ def vm_present(name, vmconfig, config=None):
             if __opts__['test']:
                 ret['changes'][vmconfig['state']['hostname']] = vmconfig['changed']
 
-            if len(ret['changes']) > 0:
+            if vmconfig['state']['hostname'] in ret['changes'] and len(ret['changes'][vmconfig['state']['hostname']]) > 0:
                 ret['comment'] = 'vm {0} updated'.format(vmconfig['state']['hostname'])
                 if config['kvm_reboot'] and vmconfig['current']['brand'] == 'kvm' and not __opts__['test']:
                     if vmconfig['state']['hostname'] in __salt__['vmadm.list'](order='hostname', search='state=running'):
@@ -693,6 +693,7 @@ def vm_present(name, vmconfig, config=None):
                     if kvm_needs_start:
                         __salt__['vmadm.start'](vm=vmconfig['state']['hostname'], key='hostname')
             else:
+                ret['changes'] = {}
                 ret['comment'] = 'vm {0} is up to date'.format(vmconfig['state']['hostname'])
 
             if 'image_uuid' in vmconfig['current'] and vmconfig['reprovision_uuid'] != vmconfig['current']['image_uuid']:
@@ -812,7 +813,7 @@ def vm_absent(name, archive=False):
         else:
             ret['result'] = True
 
-        if not isinstance(ret['result'], (bool)) and 'Error' in ret['result']:
+        if not isinstance(ret['result'], bool) and ret['result'].get('Error'):
             ret['result'] = False
             ret['comment'] = 'failed to delete vm {0}'.format(name)
         else:
@@ -847,7 +848,7 @@ def vm_running(name):
     else:
         # start the vm
         ret['result'] = True if __opts__['test'] else __salt__['vmadm.start'](name, key='hostname')
-        if not isinstance(ret['result'], (bool)) and 'Error' in ret['result']:
+        if not isinstance(ret['result'], bool) and ret['result'].get('Error'):
             ret['result'] = False
             ret['comment'] = 'failed to start {0}'.format(name)
         else:
@@ -882,7 +883,7 @@ def vm_stopped(name):
     else:
         # stop the vm
         ret['result'] = True if __opts__['test'] else __salt__['vmadm.stop'](name, key='hostname')
-        if not isinstance(ret['result'], (bool)) and 'Error' in ret['result']:
+        if not isinstance(ret['result'], bool) and ret['result'].get('Error'):
             ret['result'] = False
             ret['comment'] = 'failed to stop {0}'.format(name)
         else:
