@@ -3,6 +3,13 @@
 Package support for openSUSE via the zypper package manager
 
 :depends: - ``rpm`` Python module.  Install with ``zypper install rpm-python``
+
+.. important::
+    If you feel that Salt should be using this module to manage packages on a
+    minion, and it is using a different module (or gives an error similar to
+    *'pkg.install' is not available*), see :ref:`here
+    <module-provider-override>`.
+
 '''
 
 # Import python libs
@@ -1331,12 +1338,19 @@ def list_products(all=False, refresh=False):
 
     call = __salt__['cmd.run_all'](cmd, output_loglevel='trace')
     doc = dom.parseString(_zypper_check_result(call, xml=True))
-    for prd in doc.getElementsByTagName('product-list')[0].getElementsByTagName('product'):
+    product_list = doc.getElementsByTagName('product-list')
+    if not product_list:
+        return ret  # No products found
+
+    for prd in product_list[0].getElementsByTagName('product'):
         p_nfo = dict()
         for k_p_nfo, v_p_nfo in prd.attributes.items():
             p_nfo[k_p_nfo] = k_p_nfo not in ['isbase', 'installed'] and v_p_nfo or v_p_nfo in ['true', '1']
-        p_nfo['eol'] = prd.getElementsByTagName('endoflife')[0].getAttribute('text')
-        p_nfo['eol_t'] = int(prd.getElementsByTagName('endoflife')[0].getAttribute('time_t'))
+
+        eol = prd.getElementsByTagName('endoflife')
+        if eol:
+            p_nfo['eol'] = eol[0].getAttribute('text')
+            p_nfo['eol_t'] = int(eol[0].getAttribute('time_t') or 0)
         p_nfo['description'] = " ".join(
             [line.strip() for line in _get_first_aggregate_text(
                 prd.getElementsByTagName('description')

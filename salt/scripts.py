@@ -80,7 +80,10 @@ def minion_process(queue):
         minion = salt.cli.daemons.Minion()
         minion.start()
     except (Exception, SaltClientError, SaltReqTimeoutError, SaltSystemExit) as exc:
-        log.error('Minion failed to start: {0}'.format(exc.message), exc_info=False)
+        log.error(
+            'Minion failed to start: {0}'.format(exc.message),
+            exc_info=True
+        )
         restart = True
     except SystemExit as exc:
         restart = False
@@ -297,6 +300,8 @@ def salt_key():
             SystemExit('\nExiting gracefully on Ctrl-c'),
             err,
             hardcrash, trace=trace)
+    except Exception as err:
+        sys.stderr.write("Error: {0}\n".format(err.message))
 
 
 def salt_cp():
