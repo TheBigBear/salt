@@ -628,13 +628,15 @@ class SMinion(MinionBase):
         '''
         Load all of the modules for the minion
         '''
-        self.opts['pillar'] = salt.pillar.get_pillar(
-            self.opts,
-            self.opts['grains'],
-            self.opts['id'],
-            self.opts['environment'],
-            pillarenv=self.opts.get('pillarenv'),
-        ).compile_pillar()
+        if self.opts.get('master_type') != 'disable':
+            self.opts['pillar'] = salt.pillar.get_pillar(
+                self.opts,
+                self.opts['grains'],
+                self.opts['id'],
+                self.opts['environment'],
+                pillarenv=self.opts.get('pillarenv'),
+            ).compile_pillar()
+
         self.utils = salt.loader.utils(self.opts)
         self.functions = salt.loader.minion_mods(self.opts, utils=self.utils,
                                                  include_errors=True)
@@ -1033,32 +1035,6 @@ class Minion(MinionBase):
                 continue
             mod_opts[key] = val
         return mod_opts
-
-    def _process_beacons(self):
-        '''
-        Process each beacon and send events if appropriate
-        '''
-        # Process Beacons
-        try:
-            beacons = self.process_beacons(self.functions)
-        except Exception as exc:
-            log.critical('Beacon processing failed: {0}. No beacons will be processed.'.format(traceback.format_exc(exc)))
-            beacons = None
-        if beacons:
-            self._fire_master(events=beacons)
-            for beacon in beacons:
-                serialized_data = salt.utils.dicttrim.trim_dict(
-                    self.serial.dumps(beacon['data']),
-                    self.opts.get('max_event_size', 1048576),
-                    is_msgpacked=True,
-                )
-                log.debug('Sending event - data = {0}'.format(beacon['data']))
-                event = '{0}{1}{2}'.format(
-                        beacon['tag'],
-                        salt.utils.event.TAGEND,
-                        serialized_data,
-                )
-                self.event_publisher.handle_publish(event, None)
 
     def _load_modules(self, force_refresh=False, notify=False):
         '''
@@ -2060,7 +2036,7 @@ class Minion(MinionBase):
         # add handler to subscriber
         if hasattr(self, 'pub_channel') and self.pub_channel is not None:
             self.pub_channel.on_recv(self._handle_payload)
-        else:
+        elif self.opts.get('master_type') != 'disable':
             log.error('No connection to master found. Scheduled jobs will not run.')
 
         if start:
@@ -2981,7 +2957,9 @@ class ProxyMinion(Minion):
         self.functions, self.returners, self.function_errors, self.executors = self._load_modules()
 
         # we can then sync any proxymodules down from the master
-        self.functions['saltutil.sync_proxymodules'](saltenv='base')
+        # we do a sync_all here in case proxy code was installed by
+        # SPM or was manually placed in /srv/salt/_modules etc.
+        self.functions['saltutil.sync_all'](saltenv='base')
 
         # Then load the proxy module
         self.proxy = salt.loader.proxy(self.opts)
