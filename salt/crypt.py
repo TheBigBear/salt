@@ -18,6 +18,7 @@ import stat
 import traceback
 import binascii
 import weakref
+import getpass
 
 # Import third party libs
 import salt.ext.six as six
@@ -102,6 +103,11 @@ def gen_keys(keydir, keyname, keysize, user=None):
         # Between first checking and the generation another process has made
         # a key! Use the winner's key
         return priv
+
+    # Do not try writing anything, if directory has no permissions.
+    if not os.access(keydir, os.W_OK):
+        raise IOError('Write access denied to "{0}" for user "{1}".'.format(os.path.abspath(keydir), getpass.getuser()))
+
     cumask = os.umask(191)
     with salt.utils.fopen(priv, 'wb+') as f:
         f.write(gen.exportKey('PEM'))
@@ -465,10 +471,11 @@ class AsyncAuth(object):
         channel = salt.transport.client.AsyncReqChannel.factory(self.opts,
                                                                 crypt='clear',
                                                                 io_loop=self.io_loop)
+        error = None
         while True:
             try:
                 creds = yield self.sign_in(channel=channel)
-            except SaltClientError:
+            except SaltClientError as error:
                 break
             if creds == 'retry':
                 if self.opts.get('caller'):
@@ -488,9 +495,9 @@ class AsyncAuth(object):
                 del AsyncAuth.creds_map[self.__key(self.opts)]
             except KeyError:
                 pass
-            self._authenticate_future.set_exception(
-                SaltClientError('Attempt to authenticate with the salt master failed')
-            )
+            if not error:
+                error = SaltClientError('Attempt to authenticate with the salt master failed')
+            self._authenticate_future.set_exception(error)
         else:
             AsyncAuth.creds_map[self.__key(self.opts)] = creds
             self._creds = creds
@@ -1073,7 +1080,7 @@ class SAuth(AsyncAuth):
             if safe:
                 log.warning('SaltReqTimeoutError: {0}'.format(e))
                 return 'retry'
-            raise SaltClientError('Attempt to authenticate with the salt master failed')
+            raise SaltClientError('Attempt to authenticate with the salt master failed with timeout error')
 
         if 'load' in payload:
             if 'ret' in payload['load']:

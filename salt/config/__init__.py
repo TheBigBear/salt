@@ -466,6 +466,7 @@ VALID_OPTS = {
     'git_pillar_env': str,
     'git_pillar_root': str,
     'git_pillar_ssl_verify': bool,
+    'git_pillar_global_lock': bool,
     'git_pillar_user': str,
     'git_pillar_password': str,
     'git_pillar_insecure_auth': bool,
@@ -485,6 +486,7 @@ VALID_OPTS = {
     'gitfs_env_whitelist': list,
     'gitfs_env_blacklist': list,
     'gitfs_ssl_verify': bool,
+    'gitfs_global_lock': bool,
     'hgfs_remotes': list,
     'hgfs_mountpoint': str,
     'hgfs_root': str,
@@ -622,7 +624,7 @@ VALID_OPTS = {
     'reactor_worker_hwm': int,
 
     # Defines engines. See https://docs.saltstack.com/en/latest/topics/engines/
-    'engines': dict,
+    'engines': list,
 
     'serial': str,
     'search': str,
@@ -814,6 +816,13 @@ VALID_OPTS = {
     #
     # Default to False for 2016.3 and Carbon.  Switch to True for Nitrogen
     'proxy_merge_grains_in_module': bool,
+
+    # Command to use to restart salt-minion
+    'minion_restart_command': list,
+
+    # Whether or not a minion should send the results of a command back to the master
+    # Useful when a returner is the source of truth for a job result
+    'pub_ret': bool,
 }
 
 # default configurations
@@ -891,6 +900,7 @@ DEFAULT_MINION_OPTS = {
     'git_pillar_env': '',
     'git_pillar_root': '',
     'git_pillar_ssl_verify': True,
+    'git_pillar_global_lock': True,
     'git_pillar_user': '',
     'git_pillar_password': '',
     'git_pillar_insecure_auth': False,
@@ -910,6 +920,7 @@ DEFAULT_MINION_OPTS = {
     'gitfs_env_whitelist': [],
     'gitfs_env_blacklist': [],
     'gitfs_ssl_verify': True,
+    'gitfs_global_lock': True,
     'hash_type': 'md5',
     'disable_modules': [],
     'disable_returners': [],
@@ -990,7 +1001,7 @@ DEFAULT_MINION_OPTS = {
     'reactor_refresh_interval': 60,
     'reactor_worker_threads': 10,
     'reactor_worker_hwm': 10000,
-    'engines': {},
+    'engines': [],
     'tcp_keepalive': True,
     'tcp_keepalive_idle': 300,
     'tcp_keepalive_cnt': -1,
@@ -1037,6 +1048,8 @@ DEFAULT_MINION_OPTS = {
     # ZMQ HWM for EventPublisher pub socket - different for minion vs. master
     'event_publisher_pub_hwm': 1000,
     'event_match_type': 'startswith',
+    'minion_restart_command': [],
+    'pub_ret': True,
 }
 
 DEFAULT_MASTER_OPTS = {
@@ -1082,6 +1095,7 @@ DEFAULT_MASTER_OPTS = {
     'git_pillar_env': '',
     'git_pillar_root': '',
     'git_pillar_ssl_verify': True,
+    'git_pillar_global_lock': True,
     'git_pillar_user': '',
     'git_pillar_password': '',
     'git_pillar_insecure_auth': False,
@@ -1101,6 +1115,7 @@ DEFAULT_MASTER_OPTS = {
     'gitfs_env_whitelist': [],
     'gitfs_env_blacklist': [],
     'gitfs_ssl_verify': True,
+    'gitfs_global_lock': True,
     'hgfs_remotes': [],
     'hgfs_mountpoint': '',
     'hgfs_root': '',
@@ -1196,7 +1211,7 @@ DEFAULT_MASTER_OPTS = {
     'reactor_refresh_interval': 60,
     'reactor_worker_threads': 10,
     'reactor_worker_hwm': 10000,
-    'engines': {},
+    'engines': [],
     'event_return': '',
     'event_return_queue': 0,
     'event_return_whitelist': [],
