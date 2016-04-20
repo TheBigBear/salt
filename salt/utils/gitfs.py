@@ -19,6 +19,18 @@ import subprocess
 import time
 from datetime import datetime
 
+# Import salt libs
+import salt.utils
+import salt.utils.itertools
+import salt.utils.url
+import salt.fileserver
+from salt.utils.process import os_is_running as pid_exists
+from salt.exceptions import FileserverConfigError, GitLockError, get_error_message
+from salt.utils.event import tagify
+
+# Import third party libs
+import salt.ext.six as six
+
 VALID_PROVIDERS = ('gitpython', 'pygit2', 'dulwich')
 # Optional per-remote params that can only be used on a per-remote basis, and
 # thus do not have defaults in salt/config.py.
@@ -54,16 +66,8 @@ _INVALID_REPO = (
     'master to continue to use this {2} remote.'
 )
 
-# Import salt libs
-import salt.utils
-import salt.utils.itertools
-import salt.utils.url
-import salt.fileserver
-from salt.exceptions import FileserverConfigError, GitLockError
-from salt.utils.event import tagify
+log = logging.getLogger(__name__)
 
-# Import third party libs
-import salt.ext.six as six
 # pylint: disable=import-error
 try:
     import git
@@ -79,8 +83,13 @@ try:
         GitError = pygit2.errors.GitError
     except AttributeError:
         GitError = Exception
-except ImportError:
-    HAS_PYGIT2 = False
+except Exception as err:  # cffi VerificationError also may happen
+    HAS_PYGIT2 = False    # and pygit2 requrests re-compilation
+                          # on a production system (!),
+                          # but cffi might be absent as well!
+                          # Therefore just a generic Exception class.
+    if not isinstance(err, ImportError):
+        log.error('Import pygit2 failed: {0}'.format(err))
 
 try:
     import dulwich.errors
@@ -92,8 +101,6 @@ try:
 except ImportError:
     HAS_DULWICH = False
 # pylint: enable=import-error
-
-log = logging.getLogger(__name__)
 
 # Minimum versions for backend providers
 GITPYTHON_MINVER = '0.3'
@@ -404,12 +411,62 @@ class GitProvider(object):
                           os.O_CREAT | os.O_EXCL | os.O_WRONLY)
             with os.fdopen(fh_, 'w'):
                 # Write the lock file and close the filehandle
-                pass
+                os.write(fh_, str(os.getpid()))
         except (OSError, IOError) as exc:
             if exc.errno == errno.EEXIST:
-                if failhard:
-                    raise
-                return None
+                with salt.utils.fopen(self._get_lock_file(lock_type), 'r') as fd_:
+                    try:
+                        pid = int(fd_.readline().rstrip())
+                    except ValueError:
+                        # Lock file is empty, set pid to 0 so it evaluates as
+                        # False.
+                        pid = 0
+                #if self.opts.get("gitfs_global_lock") or pid and pid_exists(int(pid)):
+                global_lock_key = self.role + '_global_lock'
+                lock_file = self._get_lock_file(lock_type=lock_type)
+                if self.opts[global_lock_key]:
+                    msg = (
+                        '{0} is enabled and {1} lockfile {2} is present for '
+                        '{3} remote \'{4}\'.'.format(
+                            global_lock_key,
+                            lock_type,
+                            lock_file,
+                            self.role,
+                            self.id,
+                        )
+                    )
+                    if pid:
+                        msg += ' Process {0} obtained the lock'.format(pid)
+                        if not pid_exists(pid):
+                            msg += (' but this process is not running. The '
+                                    'update may have been interrupted. If '
+                                    'using multi-master with shared gitfs '
+                                    'cache, the lock may have been obtained '
+                                    'by another master.')
+                    log.warning(msg)
+                    if failhard:
+                        raise
+                    return
+                elif pid and pid_exists(pid):
+                    log.warning('Process %d has a %s %s lock (%s)',
+                                pid, self.role, lock_type, lock_file)
+                    if failhard:
+                        raise
+                    return
+                else:
+                    if pid:
+                        log.warning(
+                            'Process %d has a %s %s lock (%s), but this '
+                            'process is not running. Cleaning up lock file.',
+                            pid, self.role, lock_type, lock_file
+                        )
+                    success, fail = self.clear_lock()
+                    if success:
+                        return self._lock(lock_type='update',
+                                          failhard=failhard)
+                    elif failhard:
+                        raise
+                    return
             else:
                 msg = 'Unable to set {0} lock for {1} ({2}): {3} '.format(
                     lock_type,
@@ -1238,9 +1295,7 @@ class Pygit2(GitProvider):
         try:
             fetch_results = origin.fetch(**fetch_kwargs)
         except GitError as exc:
-            # Using exc.__str__() here to avoid deprecation warning
-            # when referencing exc.message
-            exc_str = exc.__str__().lower()
+            exc_str = get_error_message(exc).lower()
             if 'unsupported url protocol' in exc_str \
                     and isinstance(self.credentials, pygit2.Keypair):
                 log.error(
