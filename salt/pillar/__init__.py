@@ -49,7 +49,7 @@ def get_pillar(opts, grains, minion_id, saltenv=None, ext=None, env=None, funcs=
         'local': Pillar
     }.get(opts['file_client'], Pillar)
     # If local pillar and we're caching, run through the cache system first
-    log.info('Determining pillar cache')
+    log.debug('Determining pillar cache')
     if opts['pillar_cache']:
         log.info('Compiling pillar from cache')
         log.debug('get_pillar using pillar cache with ext: {0}'.format(ext))
@@ -791,6 +791,7 @@ class Pillar(object):
         if ext:
             if self.opts.get('ext_pillar_first', False):
                 self.opts['pillar'], errors = self.ext_pillar({}, pillar_dirs)
+                self.rend = salt.loader.render(self.opts, self.functions)
                 matches = self.top_matches(top)
                 pillar, errors = self.render_pillar(matches, errors=errors)
                 pillar = merge(pillar,

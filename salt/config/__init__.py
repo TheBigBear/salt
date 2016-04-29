@@ -677,7 +677,7 @@ VALID_OPTS = {
     # If this is set to True the first newline after a Jinja block is removed
     'jinja_trim_blocks': bool,
 
-    # FIXME Appears to be unused
+    # Cache minion ID to file
     'minion_id_caching': bool,
 
     # If set, the master will sign all publications before they are sent out
@@ -848,7 +848,7 @@ DEFAULT_MINION_OPTS = {
     'environment': None,
     'pillarenv': None,
     'pillar_opts': False,
-    # `pillar_cache` and `pillar_ttl`
+    # ``pillar_cache``, ``pillar_cache_ttl`` and ``pillar_cache_backend``
     # are not used on the minion but are unavoidably in the code path
     'pillar_cache': False,
     'pillar_cache_ttl': 3600,
