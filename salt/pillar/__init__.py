@@ -41,7 +41,7 @@ def get_pillar(opts, grains, minion_id, saltenv=None, ext=None, funcs=None,
         'local': Pillar
     }.get(opts['file_client'], Pillar)
     # If local pillar and we're caching, run through the cache system first
-    log.info('Determining pillar cache')
+    log.debug('Determining pillar cache')
     if opts['pillar_cache']:
         log.info('Compiling pillar from cache')
         log.debug('get_pillar using pillar cache with ext: {0}'.format(ext))
@@ -733,7 +733,7 @@ class Pillar(object):
                 errors.append('The "ext_pillar" option is malformed')
                 log.critical(errors[-1])
                 return {}, errors
-            if run.keys()[0] in self.opts.get('exclude_ext_pillar', []):
+            if next(six.iterkeys(run)) in self.opts.get('exclude_ext_pillar', []):
                 continue
             for key, val in six.iteritems(run):
                 if key not in self.ext_pillars:
