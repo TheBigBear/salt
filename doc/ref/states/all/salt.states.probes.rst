@@ -1,7 +1,7 @@
 ==================
-salt.states.netntp
+salt.states.probes
 ==================
 
-.. automodule:: salt.states.netntp
+.. automodule:: salt.states.probes
     :members:
 
