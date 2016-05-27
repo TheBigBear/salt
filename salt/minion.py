@@ -84,6 +84,7 @@ import salt.utils.jid
 import salt.pillar
 import salt.utils.args
 import salt.utils.event
+import salt.utils.minion
 import salt.utils.minions
 import salt.utils.schedule
 import salt.utils.error
@@ -801,15 +802,15 @@ class Minion(MinionBase):
             self.returners)
 
         # add default scheduling jobs to the minions scheduler
-        if 'mine.update' in self.functions:
-            log.info('Added mine.update to scheduler')
+        if self.opts['mine_enabled'] and 'mine.update' in self.functions:
             self.schedule.add_job({
                 '__mine_interval':
                 {
                     'function': 'mine.update',
                     'minutes': self.opts['mine_interval'],
                     'jid_include': True,
-                    'maxrunning': 2
+                    'maxrunning': 2,
+                    'return_job': self.opts.get('mine_return_job', False)
                 }
             }, persist=True)
 
@@ -1298,15 +1299,8 @@ class Minion(MinionBase):
                     load['out'] = oput
         if self.opts['cache_jobs']:
             # Local job cache has been enabled
-            fn_ = os.path.join(
-                self.opts['cachedir'],
-                'minion_jobs',
-                load['jid'],
-                'return.p')
-            jdir = os.path.dirname(fn_)
-            if not os.path.isdir(jdir):
-                os.makedirs(jdir)
-            salt.utils.fopen(fn_, 'w+b').write(self.serial.dumps(ret))
+            salt.utils.minion.cache_jobs(self.opts, load['jid'], ret)
+
         try:
             ret_val = channel.send(load, timeout=timeout)
         except SaltReqTimeoutError:
@@ -2659,8 +2653,7 @@ class ProxyMinion(Minion):
             self.returners)
 
         # add default scheduling jobs to the minions scheduler
-        if 'mine.update' in self.functions:
-            log.info('Added mine.update to scheduler')
+        if self.opts['mine_enabled'] and 'mine.update' in self.functions:
             self.schedule.add_job({
                 '__mine_interval':
                     {

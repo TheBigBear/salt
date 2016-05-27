@@ -42,6 +42,9 @@ class Mock(object):
 # pylint: enable=R0903
 
 MOCK_MODULES = [
+    # Python stdlib
+    'user',
+
     # salt core
     'Crypto',
     'Crypto.Signature',
@@ -126,11 +129,31 @@ MOCK_MODULES = [
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = Mock()
 
+def mock_decorator_with_params(*oargs, **okwargs):
+    '''
+    Optionally mock a decorator that takes parameters
+
+    E.g.:
+
+    @blah(stuff=True)
+    def things():
+        pass
+    '''
+    def inner(fn, *iargs, **ikwargs):
+        if hasattr(fn, '__call__'):
+            return fn
+        else:
+            return Mock()
+    return inner
+
 # Define a fake version attribute for the following libs.
 sys.modules['libcloud'].__version__ = '0.0.0'
 sys.modules['pymongo'].version = '0.0.0'
 sys.modules['ntsecuritycon'].STANDARD_RIGHTS_REQUIRED = 0
 sys.modules['ntsecuritycon'].SYNCHRONIZE = 0
+
+# Define a fake version attribute for the following libs.
+sys.modules['cherrypy'].config = mock_decorator_with_params
 
 
 # -- Add paths to PYTHONPATH ---------------------------------------------------
@@ -169,16 +192,16 @@ project = 'Salt'
 copyright = '2016 SaltStack, Inc.'
 
 version = salt.version.__version__
-latest_release = '2015.8.8'  # latest release
-previous_release = '2015.5.10'  # latest release from previous branch
-previous_release_dir = '2015.5'  # path on web server for previous branch
-build_type = 'latest'  # latest, previous, develop, inactive
+latest_release = '2016.3.0'  # latest release
+previous_release = '2015.8.10'  # latest release from previous branch
+previous_release_dir = '2015.8'  # path on web server for previous branch
+next_release = ''  # next release
+next_release_dir = ''  # path on web server for next release branch
 
-# set release to 'version' for develop so sha is used
-# - otherwise -
-# set release to 'latest_release' or 'previous_release'
-
-release = latest_release  # version, latest_release, previous_release
+# < --- START do not merge these settings to other branches START ---> #
+build_type = 'previous'  # latest, previous, develop, next
+release = previous_release  # version, latest_release, previous_release
+# < --- END do not merge these settings to other branches END ---> #
 
 # Set google custom search engine
 
@@ -188,6 +211,8 @@ elif release.startswith('2014.7'):
     search_cx = '004624818632696854117:thhslradbru' # 2014.7
 elif release.startswith('2015.5'):
     search_cx = '004624818632696854117:ovogwef29do' # 2015.5
+elif release.startswith('2015.8'):
+    search_cx = '004624818632696854117:aw_tegffouy' # 2015.8
 else:
     search_cx = '004624818632696854117:haj7bjntf4s'  # develop
 
@@ -248,6 +273,7 @@ extlinks = {
     'blob': ('https://github.com/saltstack/salt/blob/%s/%%s' % 'develop', None),
     'download': ('https://cloud.github.com/downloads/saltstack/salt/%s', None),
     'issue': ('https://github.com/saltstack/salt/issues/%s', 'issue '),
+    'pull': ('https://github.com/saltstack/salt/pull/%s', 'PR '),
     'formula_url': ('https://github.com/saltstack-formulas/%s', ''),
 }
 
