@@ -55,8 +55,10 @@ if salt.utils.is_windows():
     # support in ZeroMQ, we want the default to be something that has a
     # chance of working.
     _DFLT_IPC_MODE = 'tcp'
+    _MASTER_TRIES = -1
 else:
     _DFLT_IPC_MODE = 'ipc'
+    _MASTER_TRIES = 1
 
 FLO_DIR = os.path.join(
         os.path.dirname(os.path.dirname(__file__)),
@@ -297,7 +299,7 @@ VALID_OPTS = {
     'log_fmt_console': str,
 
     # The format for a given log file
-    'log_fmt_logfile': tuple,
+    'log_fmt_logfile': (tuple, str),
 
     # A dictionary of logging levels
     'log_granular_levels': dict,
@@ -998,7 +1000,7 @@ DEFAULT_MINION_OPTS = {
     'transport': 'zeromq',
     'auth_timeout': 60,
     'auth_tries': 7,
-    'master_tries': 1,
+    'master_tries': _MASTER_TRIES,
     'auth_safemode': False,
     'random_master': False,
     'minion_floscript': os.path.join(FLO_DIR, 'minion.flo'),
@@ -1414,11 +1416,24 @@ def _validate_opts(opts):
             # passed.
             return valid_type.__name__
         else:
-            if num_types == 1:
-                return valid_type.__name__
-            elif num_types > 1:
-                ret = ', '.join(x.__name__ for x in valid_type[:-1])
-                ret += ' or ' + valid_type[-1].__name__
+            def get_types(types, type_tuple):
+                for item in type_tuple:
+                    if isinstance(item, tuple):
+                        get_types(types, item)
+                    else:
+                        try:
+                            types.append(item.__name__)
+                        except AttributeError:
+                            log.warning(
+                                'Unable to interpret type %s while validating '
+                                'configuration', item
+                            )
+            types = []
+            get_types(types, valid_type)
+
+            ret = ', '.join(types[:-1])
+            ret += ' or ' + types[-1]
+            return ret
 
     errors = []
 
@@ -1459,7 +1474,7 @@ def _validate_opts(opts):
                 err.format(key,
                            val,
                            type(val).__name__,
-                           format_multi_opt(VALID_OPTS[key].__name__))
+                           format_multi_opt(VALID_OPTS[key]))
             )
 
     # RAET on Windows uses 'win32file.CreateMailslot()' for IPC. Due to this,
@@ -2896,7 +2911,12 @@ def apply_minion_config(overrides=None,
     # Enabling open mode requires that the value be set to True, and
     # nothing else!
     opts['open_mode'] = opts['open_mode'] is True
-
+    # Make sure ext_mods gets set if it is an untrue value
+    # (here to catch older bad configs)
+    opts['extension_modules'] = (
+        opts.get('extension_modules') or
+        os.path.join(opts['cachedir'], 'extmods')
+    )
     # Set up the utils_dirs location from the extension_modules location
     opts['utils_dirs'] = (
         opts.get('utils_dirs') or

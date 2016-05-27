@@ -88,6 +88,7 @@ import salt.utils.jid
 import salt.pillar
 import salt.utils.args
 import salt.utils.event
+import salt.utils.minion
 import salt.utils.minions
 import salt.utils.schedule
 import salt.utils.error
@@ -836,7 +837,7 @@ class Minion(MinionBase):
         # module.  If this is a proxy, however, we need to init the proxymodule
         # before we can get the grains.  We do this for proxies in the
         # post_master_init
-        if not salt.utils.is_proxy():
+        if not salt.utils.is_proxy() and not self.opts.get('grains'):
             self.opts['grains'] = salt.loader.grains(opts)
 
         log.info('Creating minion process manager')
@@ -1049,7 +1050,7 @@ class Minion(MinionBase):
                 )
                 self.event_publisher.handle_publish(event, None)
 
-    def _load_modules(self, force_refresh=False, notify=False):
+    def _load_modules(self, force_refresh=False, notify=False, grains=None):
         '''
         Return the functions and the returners loaded up from the loader
         module
@@ -1077,8 +1078,9 @@ class Minion(MinionBase):
         else:
             proxy = None
 
-        self.opts['grains'] = salt.loader.grains(self.opts, force_refresh, proxy=proxy)
-        self.utils = salt.loader.utils(self.opts)
+        if grains is None:
+            self.opts['grains'] = salt.loader.grains(self.opts, force_refresh, proxy=proxy)
+            self.utils = salt.loader.utils(self.opts)
 
         if self.opts.get('multimaster', False):
             s_opts = copy.deepcopy(self.opts)
@@ -1218,7 +1220,7 @@ class Minion(MinionBase):
             minion_instance = cls(opts)
             if not hasattr(minion_instance, 'functions'):
                 functions, returners, function_errors, executors = (
-                    minion_instance._load_modules()
+                    minion_instance._load_modules(grains=opts['grains'])
                     )
                 minion_instance.functions = functions
                 minion_instance.returners = returners
@@ -1549,15 +1551,7 @@ class Minion(MinionBase):
                     load['out'] = oput
         if self.opts['cache_jobs']:
             # Local job cache has been enabled
-            fn_ = os.path.join(
-                self.opts['cachedir'],
-                'minion_jobs',
-                load['jid'],
-                'return.p')
-            jdir = os.path.dirname(fn_)
-            if not os.path.isdir(jdir):
-                os.makedirs(jdir)
-            salt.utils.fopen(fn_, 'w+b').write(self.serial.dumps(ret))
+            salt.utils.minion.cache_jobs(self.opts, load['jid'], ret)
 
         def timeout_handler(*_):
             msg = ('The minion failed to return the job information for job '

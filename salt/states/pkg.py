@@ -487,13 +487,13 @@ def _find_install_targets(name=None,
                 if verify_result:
                     to_reinstall[key] = val
                     altered_files[key] = verify_result
-        else:
-            log.debug(
-                'Current version ({0}) did not match desired version '
-                'specification ({1}), adding to installation targets'
-                .format(cver, val)
-            )
-            targets[key] = val
+            else:
+                log.debug(
+                    'Current version ({0}) did not match desired version '
+                    'specification ({1}), adding to installation targets'
+                    .format(cver, val)
+                )
+                targets[key] = val
 
     if problems:
         return {'name': name,
@@ -629,6 +629,7 @@ def installed(
         for the following pkg providers: :mod:`apt <salt.modules.aptpkg>`,
         :mod:`ebuild <salt.modules.ebuild>`,
         :mod:`pacman <salt.modules.pacman>`,
+        :mod:`win_pkg <salt.modules.win_pkg>`,
         :mod:`yumpkg <salt.modules.yumpkg>`, and
         :mod:`zypper <salt.modules.zypper>`. The version number includes the
         release designation where applicable, to allow Salt to target a
@@ -866,8 +867,7 @@ def installed(
 
     |
 
-    **MULTIPLE PACKAGE INSTALLATION OPTIONS: (not supported in Windows or
-    pkgng)**
+    **MULTIPLE PACKAGE INSTALLATION OPTIONS: (not supported in pkgng)**
 
     :param list pkgs:
         A list of packages to install from a software repository. All packages
@@ -1003,6 +1003,22 @@ def installed(
     :return:
         A dictionary containing the state of the software installation
     :rtype dict:
+
+    .. note::
+
+        The ``pkg.installed`` state supports the usage of ``reload_modules``.
+        This functionality allows you to force Salt to reload all modules. In
+        many cases, Salt is clever enough to transparently reload the modules.
+        For example, if you install a package, Salt reloads modules because some
+        other module or state might require the package which was installed.
+        However, there are some edge cases where this may not be the case, which
+        is what ``reload_modules`` is meant to resolve.
+
+        You should only use ``reload_modules`` if your ``pkg.installed`` does some
+        sort of installation where if you do not reload the modules future items
+        in your state which rely on the software being installed will fail. Please
+        see the :ref:`Reloading Modules <reloading-modules>` documentation for more
+        information.
 
     '''
     if isinstance(pkgs, list) and len(pkgs) == 0:
@@ -1459,8 +1475,7 @@ def latest(
 
     Multiple Package Installation Options:
 
-    (Not yet supported for: Windows, FreeBSD, OpenBSD, MacOS, and Solaris
-    pkgutil)
+    (Not yet supported for: FreeBSD, OpenBSD, MacOS, and Solaris pkgutil)
 
     pkgs
         A list of packages to maintain at the latest available version.

@@ -34,8 +34,8 @@ If you use an older Salt version or you want to override PillarStack with a
 more recent one, follow the installation procedure below.
 
 Installing the PillarStack ``ext_pillar`` is as simple as dropping the
-``stack.py`` file in the ``<extensions_modules>/pillar`` directory (no external
-python module required), given that ``extensions_modules`` is set in your
+``stack.py`` file in the ``<extension_modules>/pillar`` directory (no external
+python module required), given that ``extension_modules`` is set in your
 salt-master configuration, see:
 http://docs.saltstack.com/en/latest/ref/configuration/master.html#extension-modules
 
@@ -238,7 +238,7 @@ being merged recursively with the ``merge-last`` previous strategy.
 ~~~~~~~~~~~~~~~~~~~
 
 If the ``remove`` strategy is selected, then content of dict or list variables
-in ``stack`` are removed only if the correponding item is present in the
+in ``stack`` are removed only if the corresponding item is present in the
 ``yaml_data`` dict.
 This allows for removing items from previously defined data.
 
@@ -403,6 +403,7 @@ def ext_pillar(minion_id, pillar, *args, **kwargs):
 
 
 def _process_stack_cfg(cfg, stack, minion_id, pillar):
+    log.debug('Config: {0}'.format(cfg))
     basedir, filename = os.path.split(cfg)
     jenv = Environment(loader=FileSystemLoader(basedir))
     jenv.globals.update({
@@ -412,8 +413,9 @@ def _process_stack_cfg(cfg, stack, minion_id, pillar):
         "minion_id": minion_id,
         "pillar": pillar,
         })
-    for path in jenv.get_template(filename).render(stack=stack).splitlines():
+    for path in _parse_stack_cfg(jenv.get_template(filename).render(stack=stack)):
         try:
+            log.debug('YAML: basedir={0}, path={1}'.format(basedir, path))
             obj = yaml.safe_load(jenv.get_template(path).render(stack=stack))
             if not isinstance(obj, dict):
                 log.info('Ignoring pillar stack template "{0}": Can\'t parse '
@@ -489,3 +491,14 @@ def _merge_list(stack, obj):
         return obj + stack
     else:
         return stack + obj
+
+
+def _parse_stack_cfg(content):
+    """Allow top level cfg to be YAML"""
+    try:
+        obj = yaml.safe_load(content)
+        if isinstance(obj, list):
+            return obj
+    except Exception as e:
+        pass
+    return content.splitlines()
