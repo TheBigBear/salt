@@ -42,6 +42,9 @@ class Mock(object):
 # pylint: enable=R0903
 
 MOCK_MODULES = [
+    # Python stdlib
+    'user',
+
     # salt core
     'Crypto',
     'Crypto.Signature',
@@ -115,8 +118,28 @@ MOCK_MODULES = [
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = Mock()
 
+def mock_decorator_with_params(*oargs, **okwargs):
+    '''
+    Optionally mock a decorator that takes parameters
+
+    E.g.:
+
+    @blah(stuff=True)
+    def things():
+        pass
+    '''
+    def inner(fn, *iargs, **ikwargs):
+        if hasattr(fn, '__call__'):
+            return fn
+        else:
+            return Mock()
+    return inner
+
 # Define a fake version attribute for libcloud so docs build as supposed
 sys.modules['libcloud'].__version__ = '0.0.0'
+
+# Define a fake version attribute for the following libs.
+sys.modules['cherrypy'].config = mock_decorator_with_params
 
 
 # -- Add paths to PYTHONPATH ---------------------------------------------------
@@ -155,7 +178,7 @@ project = 'Salt'
 copyright = '2016 SaltStack, Inc.'
 
 version = salt.version.__version__
-latest_release = '2015.8.8'  # latest release
+latest_release = '2015.8.9'  # latest release
 previous_release = '2015.5.10'  # latest release from previous branch
 previous_release_dir = '2015.5'  # path on web server for previous branch
 build_type = 'previous'  # latest, previous, develop, inactive
