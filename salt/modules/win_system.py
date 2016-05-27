@@ -318,10 +318,7 @@ def set_computer_name(name):
         ret = {'Computer Name': {'Current': get_computer_name()}}
         pending = get_pending_computer_name()
         if pending not in (None, False):
-            if pending == name.upper():
-                ret['Computer Name']['Pending'] = name
-            else:
-                ret['Computer Name']['Pending'] = pending
+            ret['Computer Name']['Pending'] = pending
         return ret
     return False
 
@@ -344,10 +341,10 @@ def get_pending_computer_name():
 
         salt 'minion-id' system.get_pending_computer_name
     '''
-    current = get_computer_name().upper()
+    current = get_computer_name()
     pending = read_value('HKLM',
-                         r'SYSTEM\CurrentControlSet\Control\ComputerName\ComputerName',
-                         'ComputerName')['vdata']
+                         r'SYSTEM\CurrentControlSet\Services\Tcpip\Parameters',
+                         'NV Hostname')['vdata']
     if pending:
         return pending if pending != current else None
     return False
@@ -615,10 +612,12 @@ def join_domain(domain,
     NETSETUP_JOIN_DOMAIN = 0x1
     NETSETUP_ACCOUNT_CREATE = 0x2
     NETSETUP_DOMAIN_JOIN_IF_JOINED = 0x20
+    NETSETUP_JOIN_WITH_NEW_NAME = 0x400
 
     join_options = 0x0
     join_options |= NETSETUP_JOIN_DOMAIN
     join_options |= NETSETUP_DOMAIN_JOIN_IF_JOINED
+    join_options |= NETSETUP_JOIN_WITH_NEW_NAME
     if not account_exists:
         join_options |= NETSETUP_ACCOUNT_CREATE
 
